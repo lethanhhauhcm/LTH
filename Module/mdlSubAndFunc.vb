@@ -6,13 +6,15 @@ Imports Microsoft.Office.Interop
 Imports System.Drawing.Printing
 
 Module mdlSubAndFunc
-    Private cmd As SqlClient.SqlCommand = Conn.CreateCommand
+    Public cmd As SqlClient.SqlCommand = Conn.CreateCommand
+    Private FTrans As SqlClient.SqlTransaction
     Public Function GetLastFileName_FullPath(pDDan As String, pPattern As String) As String
         Dim DDan As String = pDDan
         Dim FileNamePattern As String = DDan & pPattern
         Dim LstModif As Date = CDate("01-Jan-2010")
         Dim tmpFName As String = Dir(FileNamePattern)
         Dim LstFileName As String = ""
+
         Do While tmpFName <> ""
             If LstModif < File.GetCreationTime(DDan & tmpFName) Then
                 LstModif = File.GetCreationTime(DDan & tmpFName)
@@ -5367,4 +5369,118 @@ NoImportBill:
         End Try
     End Function
     '^_^20220712 add by 7643 -e-
+
+    '^_^20230127 add by 7643 -b-
+    Public Sub SelectPage(xTab As TabControl, xPage As TabPage)
+        Dim mPage As TabPage
+        Dim mForm As New frmMain
+        'xTab.TabPages.Clear()
+        'xTab.TabPages.Add(xPage)
+
+        mPage = mForm.Controls(xTab.Name).Controls(xPage.Name)
+        xTab.TabPages.Clear()
+        xTab.TabPages.Add(mPage)
+
+    End Sub
+
+    Public Function cboValidated(xCbo As ComboBox) As Boolean
+        If xCbo.Items.Count = 0 Then
+            xCbo.Text = ""
+            Return False
+        End If
+
+        xCbo.SelectedIndex = IIf(xCbo.Text = "" Or xCbo.FindString(xCbo.Text) = -1, 0, xCbo.FindString(xCbo.Text))
+
+        Return True
+    End Function
+
+    Public Function SortString(xStr As String) As String
+        Dim mArrStr(), mResult As String
+        Dim mList As New List(Of String)
+        Dim i As Integer
+
+        mArrStr = Split(xStr, vbLf)
+        mList.AddRange(mArrStr)
+        mList.Sort()
+        mResult = ""
+        For i = 0 To mList.Count - 1
+            mResult &= IIf(mResult <> "", vbLf, "") & mList(i)
+        Next
+
+        Return mResult
+    End Function
+
+    Public Sub DefaultControl(xParent As Control)
+        Dim i As Integer
+
+        For i = 0 To xParent.Controls.Count - 1
+            If TypeOf xParent.Controls(i) Is TextBox Then
+                CType(xParent.Controls(i), TextBox).Text = ""
+            ElseIf TypeOf xParent.Controls(i) Is ComboBox Then
+                CType(xParent.Controls(i), ComboBox).SelectedIndex = IIf(CType(xParent.Controls(i), ComboBox).Items.Count > 0, 0, -1)
+            End If
+        Next
+    End Sub
+
+    Public Function CheckFile(xFile As String) As Boolean
+        Dim mFileName As String
+
+        If Not File.Exists(xFile) Then
+            mFileName = xFile.Substring(xFile.LastIndexOf("\") + 1)
+            MsgBox(mFileName & " is not exists!")
+            Return False
+        End If
+
+        Return True
+    End Function
+
+    Public Sub LoadCboFromFile(xCbo As ComboBox)
+        Dim mItems As String
+
+        xCbo.Items.Clear()
+        xCbo.Text = ""
+        If Not File.Exists(Application.StartupPath & "\" & Split(xCbo.Name, "cbo")(1) & ".txt") Then Exit Sub
+
+        mItems = My.Computer.FileSystem.ReadAllText(Application.StartupPath & "\" & Split(xCbo.Name, "cbo")(1) & ".txt")
+        xCbo.Items.AddRange(Split(mItems, vbLf))
+        xCbo.SelectedIndex = 0
+    End Sub
+    '^_^20230127 add by 7643 -e-
+
+    Public Sub BeginTrans()
+        cmd.Connection = Conn
+        FTrans = Conn.BeginTransaction
+        cmd.Transaction = FTrans
+    End Sub
+
+    Public Sub CommitTrans()
+        FTrans.Commit()
+    End Sub
+
+    'Public Sub RollbackTrans()
+    '    FTrans.Rollback()
+    'End Sub
+
+    Public Function ExecuteSQL(xSQL As String) As Boolean
+        Try
+            cmd.CommandText = xSQL
+            cmd.ExecuteNonQuery()
+        Catch ex As Exception
+            MsgBox(ex.Message)
+            FTrans.Rollback()
+            Return False
+        End Try
+
+        Return True
+    End Function
+
+    Public Sub DefaultValue(xParent As Control, xSource As DataGridView)
+        Dim i As Integer
+
+        For i = 0 To xParent.Controls.Count - 1
+            If TypeOf xParent.Controls(i) Is TextBox Then
+                CType(xParent.Controls(i), TextBox).Text = xSource.CurrentRow.Cells(Split(xParent.Controls(i).Name, "txt").Last).Value
+            End If
+        Next
+    End Sub
 End Module
